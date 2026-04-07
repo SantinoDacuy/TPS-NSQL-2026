@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Mando-Rent | The Mandalorian</title>
+    <style>
+        body { background-color: #1a1a1a; color: #f0db4f; font-family: 'Segoe UI', sans-serif; text-align: center; }
+        table { margin: 20px auto; border-collapse: collapse; width: 80%; background-color: #262626; }
+        th, td { border: 1px solid #444; padding: 12px; text-align: left; }
+        th { background-color: #333; color: #ffcc00; text-transform: uppercase; }
+        .btn-reservar { background-color: #f0db4f; color: black; border: none; padding: 8px 15px; cursor: pointer; font-weight: bold; }
+        .btn-pagar { background-color: #28a745; color: white; border: none; padding: 8px 15px; cursor: pointer; }
+        .estado-disponible { color: #28a745; font-weight: bold; }
+        .estado-reservado { color: #ffc107; font-weight: bold; }
+        .estado-alquilado { color: #dc3545; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <h1>THE MANDALORIAN - ALQUILER DE CAPÍTULOS</h1>
+    <p>Gestionado con Redis NoSQL</p>
+    
+    <table>
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Nombre del Capítulo</th>
+                <th>Estado Actual</th>
+                <th>Acciones</th>
+            </tr>
+        </thead>
+        <tbody id="tabla-capitulos">
+            </tbody>
+    </table>
+
+    <script>
+        // Función para cargar la lista desde el Punto 1
+        async function cargarCapitulos() {
+            const res = await fetch('/capitulos');
+            const caps = await res.json();
+            const tabla = document.getElementById('tabla-capitulos');
+            tabla.innerHTML = '';
+
+            caps.forEach(c => {
+                let accionBtn = '';
+                if (c.estado === 'disponible') {
+                    accionBtn = `<button class="btn-reservar" onclick="reservar('${c.id}')">RESERVAR (4 MIN)</button>`;
+                } else if (c.estado === 'reservado') {
+                    accionBtn = `<button class="btn-pagar" onclick="pagar('${c.id}')">CONFIRMAR PAGO ($500)</button>`;
+                } else {
+                    accionBtn = `<span>Alquilado (24hs)</span>`;
+                }
+
+                tabla.innerHTML += `
+                    <tr>
+                        <td>${c.id}</td>
+                        <td>${c.nombre}</td>
+                        <td class="estado-${c.estado}">${c.estado.toUpperCase()}</td>
+                        <td>${accionBtn}</td>
+                    </tr>`;
+            });
+        }
+
+        async function reservar(id) {
+            await fetch(`/reservar/${id}`, { method: 'POST' });
+            alert("Reserva exitosa por 4 minutos");
+            cargarCapitulos();
+        }
+
+        async function pagar(id) {
+            await fetch('/pagar', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ id: id, precio: 500 })
+            });
+            alert("Pago confirmado. Disfrutá el capítulo por 24hs");
+            cargarCapitulos();
+        }
+
+        cargarCapitulos();
+        // Recargar cada 10 segundos para ver si expiran las reservas
+        setInterval(cargarCapitulos, 10000);
+    </script>
+</body>
+</html>
