@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>GeoTurismo CDU - TP3</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: #1a1a2e;
+      color: #e0e0e0;
+      min-height: 100vh;
+      padding: 24px;
+    }
+
+    h1 {
+      text-align: center;
+      font-size: 1.8rem;
+      color: #a8d8ea;
+      margin-bottom: 6px;
+    }
+
+    .subtitulo {
+      text-align: center;
+      font-size: 0.85rem;
+      color: #888;
+      margin-bottom: 28px;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      max-width: 960px;
+      margin: 0 auto;
+    }
+
+    .card {
+      background: #16213e;
+      border: 1px solid #0f3460;
+      border-radius: 12px;
+      padding: 20px;
+    }
+
+    .card h2 {
+      font-size: 1rem;
+      color: #a8d8ea;
+      margin-bottom: 14px;
+      border-bottom: 1px solid #0f3460;
+      padding-bottom: 8px;
+    }
+
+    label { font-size: 0.8rem; color: #aaa; display: block; margin-bottom: 2px; margin-top: 10px; }
+
+    input, select {
+      width: 100%;
+      padding: 8px 10px;
+      border-radius: 6px;
+      border: 1px solid #0f3460;
+      background: #0f3460;
+      color: #e0e0e0;
+      font-size: 0.9rem;
+    }
+
+    button {
+      margin-top: 14px;
+      width: 100%;
+      padding: 10px;
+      background: #e94560;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 0.95rem;
+      font-weight: bold;
+      transition: background 0.2s;
+    }
+
+    button:hover { background: #c73652; }
+
+    .mensaje {
+      margin-top: 12px;
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-size: 0.85rem;
+    }
+    .ok  { background: #1a4731; color: #6fcf97; }
+    .err { background: #4a1a1a; color: #eb5757; }
+
+    /* Tarjetas de resultados */
+    #lista-cercanos { margin-top: 14px; display: flex; flex-direction: column; gap: 10px; }
+
+    .lugar-card {
+      background: #0f3460;
+      border-radius: 8px;
+      padding: 12px 14px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .lugar-card .nombre { font-weight: bold; font-size: 0.95rem; }
+    .lugar-card .dist   { font-size: 0.8rem; color: #a8d8ea; }
+
+    .lugar-card button {
+      margin-top: 0;
+      width: auto;
+      padding: 6px 12px;
+      font-size: 0.78rem;
+      background: #533483;
+    }
+    .lugar-card button:hover { background: #3d2263; }
+
+    #resultado-distancia {
+      margin-top: 14px;
+      padding: 12px;
+      border-radius: 8px;
+      background: #0f3460;
+      font-size: 0.9rem;
+      display: none;
+    }
+
+    #resultado-distancia span { color: #e94560; font-weight: bold; font-size: 1.1rem; }
+
+    @media (max-width: 640px) {
+      .grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+  <h1>📍 GeoTurismo — Concepción del Uruguay</h1>
+  <p class="subtitulo">API de Puntos de Interés con Redis Geo · TP3</p>
+
+  <div class="grid">
+
+    <!-- CARD 1: Agregar lugar -->
+    <div class="card">
+      <h2>➕ Agregar Punto de Interés</h2>
+
+      <label>Nombre del lugar</label>
+      <input id="add_nombre" placeholder="Ej: UADER FCYT">
+
+      <label>Grupo</label>
+      <select id="add_grupo">
+        <option value="cervecerias">Cervecerías artesanales</option>
+        <option value="universidades">Universidades</option>
+        <option value="farmacias">Farmacias</option>
+        <option value="emergencias">Centros de Emergencias</option>
+        <option value="supermercados">Supermercados</option>
+      </select>
+
+      <label>Latitud</label>
+      <input id="add_lat" placeholder="-32.484" value="-32.484">
+
+      <label>Longitud</label>
+      <input id="add_lng" placeholder="-58.235" value="-58.235">
+
+      <button onclick="agregarLugar()">Guardar en Redis</button>
+      <div id="msg-agregar"></div>
+    </div>
+
+    <!-- CARD 2: Buscar cercanos + distancia -->
+    <div class="card">
+      <h2>🔍 Buscar Lugares Cercanos (5 km)</h2>
+
+      <label>Mi latitud</label>
+      <input id="u_lat" value="-32.484">
+
+      <label>Mi longitud</label>
+      <input id="u_lng" value="-58.235">
+
+      <label>Grupo a buscar</label>
+      <select id="u_grupo">
+        <option value="cervecerias">Cervecerías artesanales</option>
+        <option value="universidades">Universidades</option>
+        <option value="farmacias">Farmacias</option>
+        <option value="emergencias">Centros de Emergencias</option>
+        <option value="supermercados">Supermercados</option>
+      </select>
+
+      <button onclick="buscarCercanos()">Buscar</button>
+
+      <div id="lista-cercanos"></div>
+
+      <!-- Resultado distancia exacta (inline, sin alert) -->
+      <div id="resultado-distancia">
+        Distancia exacta a <strong id="dist-nombre"></strong>:
+        <span id="dist-valor"></span> km
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    const API = 'http://localhost:5000';
+
+    // ── Punto 2: Agregar lugar ─────────────────────────────────────────────
+    async function agregarLugar() {
+      const body = {
+        nombre: document.getElementById('add_nombre').value.trim(),
+        grupo:  document.getElementById('add_grupo').value,
+        lat:    parseFloat(document.getElementById('add_lat').value),
+        lng:    parseFloat(document.getElementById('add_lng').value)
+      };
+
+      const msgEl = document.getElementById('msg-agregar');
+
+      if (!body.nombre) {
+        msgEl.innerHTML = '<div class="mensaje err">El nombre no puede estar vacío.</div>';
+        return;
+      }
+
+      try {
+        const res  = await fetch(`${API}/lugares/agregar`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body)
+        });
+        const data = await res.json();
+
+        if (res.ok) {
+          msgEl.innerHTML = `<div class="mensaje ok">✔ ${data.mensaje}</div>`;
+          document.getElementById('add_nombre').value = '';
+        } else {
+          msgEl.innerHTML = `<div class="mensaje err">✖ ${data.error}</div>`;
+        }
+      } catch (e) {
+        msgEl.innerHTML = '<div class="mensaje err">No se pudo conectar con la API.</div>';
+      }
+    }
+
+    // ── Punto 3: Buscar cercanos ───────────────────────────────────────────
+    async function buscarCercanos() {
+      const grupo = document.getElementById('u_grupo').value;
+      const lat   = document.getElementById('u_lat').value;
+      const lng   = document.getElementById('u_lng').value;
+
+      document.getElementById('resultado-distancia').style.display = 'none';
+      const contenedor = document.getElementById('lista-cercanos');
+      contenedor.innerHTML = '<p style="color:#888;font-size:0.85rem">Buscando...</p>';
+
+      try {
+        const res  = await fetch(`${API}/lugares/cercanos?grupo=${grupo}&lat=${lat}&lng=${lng}`);
+        const data = await res.json();
+
+        if (!res.ok) {
+          contenedor.innerHTML = `<div class="mensaje err">✖ ${data.error}</div>`;
+          return;
+        }
+
+        if (data.lugares.length === 0) {
+          contenedor.innerHTML = '<p style="color:#888;font-size:0.85rem">Sin resultados en 5 km.</p>';
+          return;
+        }
+
+        contenedor.innerHTML = data.lugares.map(l => `
+          <div class="lugar-card">
+            <div>
+              <div class="nombre">${l.nombre}</div>
+              <div class="dist">~${l.distancia_km} km</div>
+            </div>
+            <button onclick="verDistanciaExacta('${l.nombre}', '${grupo}')">
+              Distancia exacta
+            </button>
+          </div>
+        `).join('');
+
+      } catch (e) {
+        contenedor.innerHTML = '<div class="mensaje err">No se pudo conectar con la API.</div>';
+      }
+    }
+
+    // ── Punto 4: Distancia exacta (inline, sin alert) ──────────────────────
+    async function verDistanciaExacta(nombre, grupo) {
+      const lat = document.getElementById('u_lat').value;
+      const lng = document.getElementById('u_lng').value;
+
+      try {
+        const res  = await fetch(`${API}/lugares/distancia?grupo=${grupo}&nombre=${encodeURIComponent(nombre)}&lat=${lat}&lng=${lng}`);
+        const data = await res.json();
+
+        const panel = document.getElementById('resultado-distancia');
+        document.getElementById('dist-nombre').textContent = nombre;
+        document.getElementById('dist-valor').textContent  = data.distancia_km ?? 'N/A';
+        panel.style.display = 'block';
+
+      } catch (e) {
+        console.error('Error al obtener distancia exacta:', e);
+      }
+    }
+  </script>
+
+</body>
+</html>
